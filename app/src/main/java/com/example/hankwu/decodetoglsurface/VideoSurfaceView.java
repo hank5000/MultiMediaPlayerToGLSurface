@@ -21,15 +21,15 @@ import android.util.Log;
 class VideoSurfaceView extends GLSurfaceView {
 
     VideoRender mRenderer;
-    static public int number_of_play = 4;
-    static public int row = 2;
-    static public int col = 2;
+    static public int number_of_play = 1;
+    static public int row = 1;
+    static public int col = 1;
 
     public VideoSurfaceView(Context context) {
         super(context);
 
         setEGLContextClientVersion(2);
-        mRenderer = new VideoRender();
+        mRenderer = new VideoRender(context);
         setRenderer(mRenderer);
     }
 
@@ -103,12 +103,12 @@ class VideoSurfaceView extends GLSurfaceView {
         //TODO: Think view port, maybe can use real resolution to set X,Y,Z position
         //TODO: Maybe it doesn't need to scale to min -1 -1 0 max 1 1 0.
 
-        public VideoRender() {
+        public VideoRender(Context context) {
             mTriangleVertices = ByteBuffer.allocateDirect(
                     mTriangleVerticesData.length * FLOAT_SIZE_BYTES)
                     .order(ByteOrder.nativeOrder()).asFloatBuffer();
             mTriangleVertices.put(mTriangleVerticesData).position(0);
-
+            mTriangleVerticesCollector = new FloatBuffer[number_of_play];
 
             float delta_x = 2.0f / col;
             float delta_y = 2.0f / row;
@@ -198,7 +198,6 @@ class VideoSurfaceView extends GLSurfaceView {
                 checkGlError("glDrawArrays");
             }
             GLES20.glFinish();
-
         }
 
         @Override
@@ -250,24 +249,23 @@ class VideoSurfaceView extends GLSurfaceView {
                         GLES20.GL_LINEAR);
 
             /*
-             * Create the SurfaceTexture that will feed this textureID,
-             * and pass it to the MediaPlayer
+             * Create the SurfaceTexture and pass it to the MediaPlayer
              */
                 mSurfaceTextures[i] = new SurfaceTexture(mTextureID);
             }
-
 
             // MediaPlayerController part
             MediaPlayerController.mediaPlayerControllerSingleton.setSurfaceTextures(mSurfaceTextures);
             try {
                 String[] path = new String[number_of_play];
                 for(int i=0;i<number_of_play;i++) {
-                    path[i] = "/mnt/hank/720.mp4";
+                    path[i] = "/sdcard/Download/720_mute.mp4";
                 }
                 MediaPlayerController.mediaPlayerControllerSingleton.setDataSources(path);
                 MediaPlayerController.mediaPlayerControllerSingleton.prepare();
                 MediaPlayerController.mediaPlayerControllerSingleton.start();
             } catch (IOException e) {
+                Log.d("HANK",e.toString());
                 e.printStackTrace();
             }
 

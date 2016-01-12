@@ -1,18 +1,26 @@
 package com.example.hankwu.decodetoglsurface;
 
+import android.app.ActionBar;
+import android.app.Activity;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.LinearLayout;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends Activity {
     VideoSurfaceView mVideoSurfaceView = null;
-    @Override
+    MainActivity act = this;
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-    }
 
+        setContentView(R.layout.activity_main);
+        // Add GLSurfaceView to Activity
+        LinearLayout ll = (LinearLayout) findViewById(R.id.hank);
+        mVideoSurfaceView = new VideoSurfaceView(this);
+        ll.addView(mVideoSurfaceView);
+
+    }
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
