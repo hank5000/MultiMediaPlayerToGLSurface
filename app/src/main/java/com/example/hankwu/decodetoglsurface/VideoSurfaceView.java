@@ -17,19 +17,26 @@ import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
 import android.util.Log;
 
+import com.example.hankwu.decodetoglsurface.encode.Encoder;
+import com.example.hankwu.decodetoglsurface.encode.Recorder;
+
 @SuppressLint("ViewConstructor")
 class VideoSurfaceView extends GLSurfaceView {
 
     VideoRender mRenderer;
-    static public int number_of_play = 1;
-    static public int row = 1;
-    static public int col = 1;
+    static public int number_of_play = GlobalInfo.getNumberOfDecode();
+    static public int row = GlobalInfo.getNumberOfLayoutRow();
+    static public int col = GlobalInfo.getNumberOfLayoutColumn();
 
     public VideoSurfaceView(Context context) {
         super(context);
 
         setEGLContextClientVersion(2);
         mRenderer = new VideoRender(context);
+        if(GlobalInfo.isEncodeEnable()) {
+            setEGLContextFactory(mRenderer.mContextFactory);
+            setEGLWindowSurfaceFactory(mRenderer.mWindowSurfaceFactory);
+        }
         setRenderer(mRenderer);
     }
 
@@ -39,8 +46,24 @@ class VideoSurfaceView extends GLSurfaceView {
 //            public void run() {
 //
 //            }});
-
         super.onResume();
+    }
+
+    @Override
+    public void onPause() {
+
+        if(GlobalInfo.isRecordMode()) {
+            if(Recorder.getRecorder().isStarted())
+                Recorder.getRecorder().stop();
+        } else if(GlobalInfo.isMediaCodecMuxerMode()) {
+            Encoder.getEncoder().stop_write();
+            Encoder.getEncoder().Destroy();
+        }
+
+
+        MediaPlayerController.mediaPlayerControllerSingleton.stop();
+
+        super.onPause();
     }
 
     private static class VideoRender
@@ -100,9 +123,13 @@ class VideoSurfaceView extends GLSurfaceView {
 
         private static int GL_TEXTURE_EXTERNAL_OES = 0x8D65;
 
+
+        public WindowSurfaceFactory mWindowSurfaceFactory = new WindowSurfaceFactory();
+        public ContextFactory mContextFactory = new ContextFactory();
+
         //TODO: Think view port, maybe can use real resolution to set X,Y,Z position
         //TODO: Maybe it doesn't need to scale to min -1 -1 0 max 1 1 0.
-
+        //public ContextFactory mContextFactory = new ContextFactory();
         public VideoRender(Context context) {
             mTriangleVertices = ByteBuffer.allocateDirect(
                     mTriangleVerticesData.length * FLOAT_SIZE_BYTES)
@@ -159,9 +186,8 @@ class VideoSurfaceView extends GLSurfaceView {
 
         }
 
-        @Override
-        public void onDrawFrame(GL10 glUnused) {
 
+        public void DrawOnce() {
             for(int i=0;i<number_of_play;i++) {
                 mSurfaceTextures[i].updateTexImage();
                 mSurfaceTextures[i].getTransformMatrix(mSTMatrix);
@@ -200,10 +226,65 @@ class VideoSurfaceView extends GLSurfaceView {
             GLES20.glFinish();
         }
 
+        int frames = 0;
+        long startTime;
+        int presentCounter = 0;
         @Override
-        public void onSurfaceChanged(GL10 glUnused, int width, int height) {
+        public void onDrawFrame(GL10 glUnused) {
+
+            frames++;
+            if (System.nanoTime() - startTime >= 1000000000)
+            {
+                startTime = System.nanoTime();
+                Log.d("HANK","FPS:"+frames);
+                frames = 0;
+            }
+
+            /*TODO: Refine picking encode frame method.
+            onDrawFrame will be triggered by vsync (60 times per second)
+            but Encoder didn't need 60 fps. (30fps is enough)
+
+            We use the simple patch to let it encode 30fps
+            */
+            if(GlobalInfo.isEncodeEnable() && (presentCounter%2==0))
+            {
+                presentCounter = 0;
+                mWindowSurfaceFactory.makeCurrent(mContextFactory.getContext(), WindowSurfaceFactory.Encode_Case);
+                GLES20.glViewport(0, 0, GlobalInfo.getEncodeWidth(), GlobalInfo.getEncodeHeight());
+
+                DrawOnce();
+                mWindowSurfaceFactory.swapBuffers();
+
+                if(GlobalInfo.isRecordMode()) {
+                    if(!Recorder.getRecorder().isStarted()) {
+                        Recorder.getRecorder().start();
+                    }
+                } else if(GlobalInfo.isMediaCodecMuxerMode()){
+                    Encoder.getEncoder().run_encode();
+                }
+
+                if(!Recorder.getRecorder().isSetPreview()) {
+                    // let preview surface be render target
+                    mWindowSurfaceFactory.makeCurrent(mContextFactory.getContext(), WindowSurfaceFactory.Preview_Case);
+                }
+            }
+            presentCounter++;
+
+            if(!Recorder.getRecorder().isSetPreview()) {
+                GLES20.glViewport(0, 0, mWidth, mHeight);
+                DrawOnce();
+            }
 
         }
+
+        int mWidth = 1920;
+        int mHeight= 1080;
+        @Override
+        public void onSurfaceChanged(GL10 glUnused, int width, int height) {
+            mWidth = width;
+            mHeight = height;
+        }
+
 
         @Override
         public void onSurfaceCreated(GL10 glUnused, EGLConfig config) {
@@ -254,14 +335,23 @@ class VideoSurfaceView extends GLSurfaceView {
                 mSurfaceTextures[i] = new SurfaceTexture(mTextureID);
             }
 
-            // MediaPlayerController part
-            MediaPlayerController.mediaPlayerControllerSingleton.setSurfaceTextures(mSurfaceTextures);
             try {
                 String[] path = new String[number_of_play];
                 for(int i=0;i<number_of_play;i++) {
-                    path[i] = "/sdcard/Download/720_mute.mp4";
+                    path[i] = GlobalInfo.getPath(i);
                 }
                 MediaPlayerController.mediaPlayerControllerSingleton.setDataSources(path);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            // MediaPlayerController part
+            try {
+                MediaPlayerController.mediaPlayerControllerSingleton.setSurfaceTextures(mSurfaceTextures);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            try {
                 MediaPlayerController.mediaPlayerControllerSingleton.prepare();
                 MediaPlayerController.mediaPlayerControllerSingleton.start();
             } catch (IOException e) {
