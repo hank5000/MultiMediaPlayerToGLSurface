@@ -1,16 +1,21 @@
 package com.example.hankwu.decodetoglsurface;
 
 
+import java.io.BufferedOutputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 
 import javax.microedition.khronos.egl.EGLConfig;
+import javax.microedition.khronos.egl.EGLSurface;
 import javax.microedition.khronos.opengles.GL10;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.graphics.SurfaceTexture;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
@@ -19,11 +24,12 @@ import android.util.Log;
 
 import com.example.hankwu.decodetoglsurface.encode.Encoder;
 import com.example.hankwu.decodetoglsurface.encode.Recorder;
+import com.example.hankwu.decodetoglsurface.encode.SnapShot;
 
 @SuppressLint("ViewConstructor")
 class VideoSurfaceView extends GLSurfaceView {
 
-    VideoRender mRenderer;
+    public VideoRender mRenderer;
     static public int number_of_play = GlobalInfo.getNumberOfDecode();
     static public int row = GlobalInfo.getNumberOfLayoutRow();
     static public int col = GlobalInfo.getNumberOfLayoutColumn();
@@ -33,10 +39,10 @@ class VideoSurfaceView extends GLSurfaceView {
 
         setEGLContextClientVersion(2);
         mRenderer = new VideoRender(context);
-        if(GlobalInfo.isEncodeEnable()) {
-            setEGLContextFactory(mRenderer.mContextFactory);
-            setEGLWindowSurfaceFactory(mRenderer.mWindowSurfaceFactory);
-        }
+
+        setEGLContextFactory(mRenderer.mContextFactory);
+        setEGLWindowSurfaceFactory(mRenderer.mWindowSurfaceFactory);
+
         setRenderer(mRenderer);
     }
 
@@ -123,7 +129,6 @@ class VideoSurfaceView extends GLSurfaceView {
 
         private static int GL_TEXTURE_EXTERNAL_OES = 0x8D65;
 
-
         public WindowSurfaceFactory mWindowSurfaceFactory = new WindowSurfaceFactory();
         public ContextFactory mContextFactory = new ContextFactory();
 
@@ -187,12 +192,55 @@ class VideoSurfaceView extends GLSurfaceView {
         }
 
 
+        public void drawSnapShot(int i,String path) {
+            EGLSurface s = SnapShot.snapShot.getEglSurface();
+
+            mWindowSurfaceFactory.makeCurrent(mContextFactory.getContext(), s);
+            GLES20.glViewport(0, 0, 1280, 720);
+
+            mSurfaceTextures[i].updateTexImage();
+            mSurfaceTextures[i].getTransformMatrix(mSTMatrix);
+            GLES20.glUseProgram(mProgram);
+            checkGlError("glUseProgram");
+
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+            GLES20.glBindTexture(GL_TEXTURE_EXTERNAL_OES, textures[i]);
+
+            tmpTriangleVertices = SnapShot.snapShot.mTriangleVertices;
+
+            tmpTriangleVertices.position(TRIANGLE_VERTICES_DATA_POS_OFFSET);
+            GLES20.glVertexAttribPointer(maPositionHandle, 3, GLES20.GL_FLOAT, false,
+                    TRIANGLE_VERTICES_DATA_STRIDE_BYTES, tmpTriangleVertices);
+            checkGlError("glVertexAttribPointer maPosition");
+            GLES20.glEnableVertexAttribArray(maPositionHandle);
+            checkGlError("glEnableVertexAttribArray maPositionHandle");
+
+            tmpTriangleVertices.position(TRIANGLE_VERTICES_DATA_UV_OFFSET);
+            GLES20.glVertexAttribPointer(maTextureHandle, 3, GLES20.GL_FLOAT, false,
+                    TRIANGLE_VERTICES_DATA_STRIDE_BYTES, tmpTriangleVertices);
+            checkGlError("glVertexAttribPointer maTextureHandle");
+            GLES20.glEnableVertexAttribArray(maTextureHandle);
+            checkGlError("glEnableVertexAttribArray maTextureHandle");
+
+            Matrix.setIdentityM(mMVPMatrix, 0);
+            GLES20.glUniformMatrix4fv(muMVPMatrixHandle, 1, false, mMVPMatrix, 0);
+            GLES20.glUniformMatrix4fv(muSTMatrixHandle, 1, false, mSTMatrix, 0);
+
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
+            checkGlError("glDrawArrays");
+
+            GLES20.glFlush();
+            try {
+                saveFrame(path,1280,720);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
         public void DrawOnce() {
             for(int i=0;i<number_of_play;i++) {
                 mSurfaceTextures[i].updateTexImage();
                 mSurfaceTextures[i].getTransformMatrix(mSTMatrix);
-//                GLES20.glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
-//                GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT | GLES20.GL_COLOR_BUFFER_BIT);
 
                 GLES20.glUseProgram(mProgram);
                 checkGlError("glUseProgram");
@@ -229,15 +277,21 @@ class VideoSurfaceView extends GLSurfaceView {
         int frames = 0;
         long startTime;
         int presentCounter = 0;
+        int snapShotCounter = 0;
         @Override
         public void onDrawFrame(GL10 glUnused) {
 
             frames++;
+            snapShotCounter++;
             if (System.nanoTime() - startTime >= 1000000000)
             {
                 startTime = System.nanoTime();
                 Log.d("HANK","FPS:"+frames);
                 frames = 0;
+            }
+
+            if((snapShotCounter%600==599) && SnapShot.snapShot.isEnableSnapShot()) {
+                drawSnapShot(0,"/mnt/hank/SnapShot_S"+snapShotCounter+".jpeg");
             }
 
             /*TODO: Refine picking encode frame method.
@@ -263,20 +317,18 @@ class VideoSurfaceView extends GLSurfaceView {
                     Encoder.getEncoder().run_encode();
                 }
 
-                if(!Recorder.getRecorder().isSetPreview()) {
-                    // let preview surface be render target
-                    mWindowSurfaceFactory.makeCurrent(mContextFactory.getContext(), WindowSurfaceFactory.Preview_Case);
-                }
             }
             presentCounter++;
 
             if(!Recorder.getRecorder().isSetPreview()) {
+                mWindowSurfaceFactory.makeCurrent(mContextFactory.getContext(), WindowSurfaceFactory.Preview_Case);
                 GLES20.glViewport(0, 0, mWidth, mHeight);
                 DrawOnce();
             }
 
         }
 
+        //default width and height
         int mWidth = 1920;
         int mHeight= 1080;
         @Override
@@ -334,6 +386,10 @@ class VideoSurfaceView extends GLSurfaceView {
              */
                 mSurfaceTextures[i] = new SurfaceTexture(mTextureID);
             }
+
+
+
+
 
             try {
                 String[] path = new String[number_of_play];
@@ -418,6 +474,56 @@ class VideoSurfaceView extends GLSurfaceView {
                 throw new RuntimeException(op + ": glError " + error);
             }
         }
+        ByteBuffer mPixelBuf = null;
+
+        public void saveFrame(final String filename,int width,int height) throws IOException {
+
+            // Bitmap / PNG creation.
+            final int mWidth = width;
+            final int mHeight= height;
+            mPixelBuf = ByteBuffer.allocateDirect(width * height * 4);
+            //mPixelBuf.rewind();
+            mPixelBuf.position(0);
+            GLES20.glReadPixels(0, 0, mWidth, mHeight, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE,
+                    mPixelBuf);
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+
+                    // TODO Auto-generated method stub
+                    BufferedOutputStream bos = null;
+                    try {
+                        bos = new BufferedOutputStream(new FileOutputStream(filename));
+                        Bitmap bmp = Bitmap.createBitmap(1280, 720, Bitmap.Config.ARGB_8888);
+
+                        android.graphics.Matrix matrix = new android.graphics.Matrix();
+                        matrix.preScale(1, -1);
+
+                        bmp.copyPixelsFromBuffer(mPixelBuf);
+                        Bitmap bmmp = Bitmap.createBitmap(bmp,0,0,mWidth,mHeight,matrix, true);
+
+                        bmmp.compress(Bitmap.CompressFormat.JPEG, 90, bos);
+                        bmmp.recycle();
+                        bmp.recycle();
+                        if (bos != null) {
+                            try {
+                                bos.close();
+                            } catch (IOException e) {
+                                // TODO Auto-generated catch block
+                                e.printStackTrace();
+                            }
+                        }
+                    } catch (FileNotFoundException e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+                }}).start();
+
+
+        }
+
+
+
 
     }
 

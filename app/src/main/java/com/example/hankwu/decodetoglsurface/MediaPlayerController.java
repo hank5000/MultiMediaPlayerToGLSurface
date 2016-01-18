@@ -8,6 +8,8 @@ import com.via.rtsp.RTSPCodec;
 
 import java.io.IOException;
 
+import javax.microedition.khronos.egl.EGLSurface;
+
 /**
  * Created by HankWu on 16/1/9.
  */
@@ -28,7 +30,6 @@ public class MediaPlayerController {
         if(sts.length!=number_of_play) {
             throw new Exception("#SurfaceTexture!=#DataSource!");
         }
-
         for(int i=0;i<number_of_play;i++) {
             Surface surface = new Surface(sts[i]);
             if(mps[i]!=null) {
@@ -75,8 +76,10 @@ public class MediaPlayerController {
 
     public void start() {
         for(int i=0;i<number_of_play;i++) {
-            if(mps[i]!=null)
+            if(mps[i]!=null) {
+                mps[i].setLooping(true);
                 mps[i].start();
+            }
             if(rps[i]!=null)
                 rps[i].start();
         }

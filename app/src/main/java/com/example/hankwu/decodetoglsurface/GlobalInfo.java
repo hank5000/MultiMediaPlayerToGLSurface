@@ -4,24 +4,24 @@ package com.example.hankwu.decodetoglsurface;
  * Created by HankWu_Office on 2016/1/15.
  */
 public class GlobalInfo {
-    final static String[] path = {  "/mnt/hank/720.mp4",
-                                    "/mnt/hank/720.mp4",
-                                    "/mnt/hank/720.mp4",
-                                    "/mnt/hank/720.mp4"};
+    final static String path = "/mnt/hank/720.mp4";
     final static String[] rtsp_path = { "rtsp://192.168.12.52:554/user=admin&password=&channel=1&stream=0.sdp?",
                                         "rtsp://192.168.12.54:554/user=admin&password=&channel=1&stream=0.sdp?",
                                         "rtsp://192.168.12.59:554/user=admin&password=&channel=1&stream=0.sdp?",
                                         "rtsp://192.168.12.60:554/user=admin&password=&channel=1&stream=0.sdp?"};
 
-    final static boolean isRTSPMode = true;
+    final static String rtsp_path_fix = "rtsp://192.168.12.202/rtpvideo1.sdp";
+
+    final static boolean isRTSPMode = false;
     public static String getPath(int index) {
         if(isRTSPMode) {
-            return rtsp_path[index];
+            return rtsp_path_fix;
+            //return rtsp_path[index];
         } else {
-            return path[index];
+            return path;
         }
     }
-    
+
     final static String RECORD_MODE = "MediaRecorderMode";
     final static String MEDIACODEC_MUXER_MODE  = "MediaCodecMuxerMode";
     final static String DISABLE_MODE = "DisableMode";
@@ -35,11 +35,9 @@ public class GlobalInfo {
     final static int encodeWidth = 1920;
     final static int encodeHeight= 1080;
     final static int bitRate = 10000;
-    final static int numberOfDecode = 1;
+    final static int numberOfDecode = 4;
     final static int numberOfLayoutRow = 2;
     final static int numberOfLayoutColumn = 2;
-
-
 
     public static int getNumberOfDecode() {
         return numberOfDecode;

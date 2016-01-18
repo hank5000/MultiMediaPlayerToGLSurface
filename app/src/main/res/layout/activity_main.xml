@@ -8,6 +8,11 @@
     <TextView android:text="GLSurfaceView" android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:id="@+id/textView" />
+    <!--SnapShot SurfaceView by using GLES-->
+    <SurfaceView
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:id="@+id/sv1"/>
 
     <LinearLayout
         android:orientation="vertical"

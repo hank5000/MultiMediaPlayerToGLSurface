@@ -6,6 +6,7 @@ import android.view.Surface;
 
 import com.example.hankwu.decodetoglsurface.encode.Encoder;
 import com.example.hankwu.decodetoglsurface.encode.Recorder;
+import com.example.hankwu.decodetoglsurface.encode.SnapShot;
 
 import java.io.IOException;
 
@@ -27,31 +28,47 @@ public class WindowSurfaceFactory implements GLSurfaceView.EGLWindowSurfaceFacto
 
     private Surface mEncodeSurface = null;
 
+
+    public EGLDisplay d = null;
+    public EGLConfig  c = null;
+
     private final String TAG = this.getClass().getName();
+
+    public EGLSurface createEGLSurface(Surface s) {
+        return egl10.eglCreateWindowSurface(d,c,s,null);
+    }
+
+
     public EGLSurface createWindowSurface(EGL10 egl, EGLDisplay display,
                                           EGLConfig config, Object nativeWindow) {
         EGLSurface result = null;
+        d = display;
+        c = config;
         try {
-            //if(GlobalInfo.isRecordMode() && !Recorder.getRecorder().isSetPreview())
             {
+                // Hook VSync
                 mEGLPreviewSurface = egl.eglCreateWindowSurface(display, config, nativeWindow, null);
             }
 
-            try {
-                if (GlobalInfo.isRecordMode()) {
-                    Recorder.getRecorder().Create();
-                    mEncodeSurface = Recorder.getRecorder().getSurface();
-                } else if (GlobalInfo.isMediaCodecMuxerMode()) {
-                    Encoder.getEncoder().Create();
-                    mEncodeSurface = Encoder.getEncoder().mEncodeSuface;
+            if(GlobalInfo.isEncodeEnable()) {
+                try {
+                    if (GlobalInfo.isRecordMode()) {
+                        Recorder.getRecorder().Create();
+                        mEncodeSurface = Recorder.getRecorder().getSurface();
+                    } else if (GlobalInfo.isMediaCodecMuxerMode()) {
+                        Encoder.getEncoder().Create();
+                        mEncodeSurface = Encoder.getEncoder().mEncodeSuface;
+                    }
+                    mEGLEncodeSurface = egl.eglCreateWindowSurface(display, config, mEncodeSurface, null);
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
-                mEGLEncodeSurface = egl.eglCreateWindowSurface(display, config, mEncodeSurface, null);
-
-            } catch(IOException e) {
-                e.printStackTrace();
             }
 
-
+            if(SnapShot.snapShot.isEnableSnapShot()) {
+                EGLSurface s = egl.eglCreateWindowSurface(display, config, SnapShot.snapShot.getSurface(), null);
+                SnapShot.snapShot.setEglSurface(s);
+            }
 
         } catch (IllegalArgumentException e) {
             Log.e(TAG, "eglCreateWindowSurface (native)", e);
@@ -76,6 +93,15 @@ public class WindowSurfaceFactory implements GLSurfaceView.EGLWindowSurfaceFacto
             egl10.eglMakeCurrent(egl10.eglGetDisplay(EGL10.EGL_DEFAULT_DISPLAY),
                     mEGLPreviewSurface, mEGLPreviewSurface,context );
         }
+    }
+
+    public void makeCurrent(EGLContext context, EGLSurface s){
+            egl10.eglMakeCurrent(egl10.eglGetDisplay(EGL10.EGL_DEFAULT_DISPLAY),
+                    s, s,context );
+    }
+
+    public void swapBuffers(EGLSurface s){
+        egl10.eglSwapBuffers(egl10.eglGetDisplay(EGL10.EGL_DEFAULT_DISPLAY), s);
     }
 
     public void swapBuffers(){

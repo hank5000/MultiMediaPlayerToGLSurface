@@ -8,25 +8,32 @@ import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.Surface;
+import android.view.SurfaceView;
 import android.widget.LinearLayout;
 
 import com.example.hankwu.decodetoglsurface.encode.Encoder;
 import com.example.hankwu.decodetoglsurface.encode.Recorder;
+import com.example.hankwu.decodetoglsurface.encode.SnapShot;
 
 public class MainActivity extends Activity {
     VideoSurfaceView mVideoSurfaceView = null;
     static MainActivity act = new MainActivity();
     Handler handler = new Handler();
-    static Surface videoSurface = null;
+    SurfaceView surf = null;
+
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_main);
+
+        // create a surfaceView to be a GL render target and snapshot it.
+        surf = (SurfaceView)findViewById(R.id.sv1);
+        SnapShot.snapShot.setSurface(surf.getHolder().getSurface());
+
         // Add GLSurfaceView to Activity
         LinearLayout ll = (LinearLayout) findViewById(R.id.hank);
         mVideoSurfaceView = new VideoSurfaceView(this);
-
         //Encoder.getEncoder().setmWriterHandler(handler);
         //Recorder.getRecorder().setPreviewSurface(mVideoSurfaceView.getHolder().getSurface());
 
