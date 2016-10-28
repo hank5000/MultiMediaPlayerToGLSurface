@@ -107,6 +107,7 @@ public class Encoder {
             }
 
         }
+        mcencoder.releaseOutputBuffer(outputBufferIdx,false);
     }
 
     public void stop_write(){
